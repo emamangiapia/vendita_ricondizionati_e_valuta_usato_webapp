@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import re
 import sqlite3
+import hashlib
 from datetime import datetime
 from pathlib import Path
 
@@ -28,6 +29,8 @@ def init_db():
           source_id TEXT NOT NULL,
           filename TEXT NOT NULL,
           sheet_name TEXT NOT NULL,
+          is_primary INTEGER NOT NULL DEFAULT 0,
+          content_hash TEXT,
           scanned_at TEXT NOT NULL,
           folder_name TEXT,
           source_url TEXT,
@@ -60,6 +63,11 @@ def init_db():
           error TEXT
         );
         """)
+        columns = {r[1] for r in db.execute("PRAGMA table_info(snapshots)")}
+        if "is_primary" not in columns:
+            db.execute("ALTER TABLE snapshots ADD COLUMN is_primary INTEGER NOT NULL DEFAULT 0")
+        if "content_hash" not in columns:
+            db.execute("ALTER TABLE snapshots ADD COLUMN content_hash TEXT")
 
 def _clean(s):
     return re.sub(r"\s+", " ", str(s or "")).strip()
@@ -145,28 +153,29 @@ def _extract_prices(rows):
         return list(records.values())
     return []
 
-def import_rows(rows, *, kind, source_id, filename, sheet_name, scanned_at, folder_name="", source_url=""):
+def import_rows(rows, *, kind, source_id, filename, sheet_name, scanned_at, folder_name="", source_url="", is_primary=False):
     if kind not in {"sale", "tradein"}:
         raise ValueError("Tipo prezzi non supportato")
     records = _extract_prices(rows)
     if not records:
         raise ValueError(f"Nessun prezzo valido trovato in {filename} / {sheet_name}")
+    content_hash = hashlib.sha256(repr(sorted(records)).encode("utf-8")).hexdigest()
     init_db()
     with connection() as db:
-        old = db.execute("SELECT id,record_count FROM snapshots WHERE kind=? AND source_id=? AND sheet_name=?",
+        old = db.execute("SELECT id,content_hash FROM snapshots WHERE kind=? AND source_id=? AND sheet_name=?",
                          (kind,source_id,sheet_name)).fetchone()
-        if old and old["record_count"] == len(records):
+        if old and old["content_hash"] == content_hash:
             return {"status": "skipped", "count": len(records), "snapshot_id": old["id"]}
         if old:
             snapshot_id = old["id"]
             db.execute("DELETE FROM prices WHERE snapshot_id=?", (snapshot_id,))
-            db.execute("""UPDATE snapshots SET filename=?, scanned_at=?,folder_name=?,source_url=?,record_count=?
-                       WHERE id=?""", (filename,scanned_at,folder_name,source_url,len(records),snapshot_id))
+            db.execute("""UPDATE snapshots SET filename=?, scanned_at=?,folder_name=?,source_url=?,record_count=?,is_primary=?,content_hash=?
+                       WHERE id=?""", (filename,scanned_at,folder_name,source_url,len(records),int(is_primary),content_hash,snapshot_id))
         else:
             cursor = db.execute("""INSERT INTO snapshots
-              (kind,source_id,filename,sheet_name,scanned_at,folder_name,source_url,record_count)
-              VALUES(?,?,?,?,?,?,?,?)""",
-              (kind,source_id,filename,sheet_name,scanned_at,folder_name,source_url,len(records)))
+              (kind,source_id,filename,sheet_name,scanned_at,folder_name,source_url,record_count,is_primary,content_hash)
+              VALUES(?,?,?,?,?,?,?,?,?,?)""",
+              (kind,source_id,filename,sheet_name,scanned_at,folder_name,source_url,len(records),int(is_primary),content_hash))
             snapshot_id = cursor.lastrowid
         db.executemany("""INSERT INTO prices
           (snapshot_id,model,model_key,color,color_key,storage_gb,price_eur)
@@ -179,14 +188,23 @@ def import_xlsx(path, *, kind, source_id=None, scanned_at=None, source_url="", f
     path = Path(path)
     wb = load_workbook(path, read_only=True, data_only=True)
     try:
-        sheet = next((s for s in wb.sheetnames if s.casefold() == "apple"), wb.sheetnames[0])
-        rows = list(wb[sheet].values)
-        return import_rows(rows, kind=kind,
-            source_id=source_id or f"local:{kind}:{path.name}",
-            filename=path.name, sheet_name=sheet,
-            scanned_at=scanned_at or parse_scanned_at(path.stem),
-            folder_name=folder_name or path.parent.name,
-            source_url=source_url)
+        selected = sorted(wb.sheetnames, key=lambda s: (s.casefold() != "apple", s))
+        results = []
+        for sheet in selected:
+            try:
+                results.append(import_rows(list(wb[sheet].values), kind=kind,
+                    source_id=source_id or f"local:{kind}:{path.name}",
+                    filename=path.name, sheet_name=sheet,
+                    scanned_at=scanned_at or parse_scanned_at(path.stem),
+                    folder_name=folder_name or path.parent.name,
+                    source_url=source_url,
+                    is_primary=(sheet.casefold() == "apple" or not results)))
+            except ValueError:
+                continue
+        if not results:
+            raise ValueError(f"Nessun foglio con prezzi riconosciuto in {path.name}")
+        return {"status": "imported" if any(r["status"]=="imported" for r in results) else "skipped",
+                "count":sum(r["count"] for r in results), "sheets":len(results)}
     finally:
         wb.close()
 
@@ -196,23 +214,25 @@ def frame(query, params=()):
     with connection() as db:
         return pd.read_sql_query(query, db, params=params)
 
-def latest_prices(kind):
+def latest_prices(kind, sheet_name=None):
     return frame("""
       WITH ranked AS (
         SELECT p.*,s.scanned_at,s.filename,s.source_url,
           ROW_NUMBER() OVER (PARTITION BY p.model_key,p.color_key,p.storage_gb
             ORDER BY s.scanned_at DESC,s.id DESC) AS rn
-        FROM prices p JOIN snapshots s ON s.id=p.snapshot_id WHERE s.kind=?
+        FROM prices p JOIN snapshots s ON s.id=p.snapshot_id
+        WHERE s.kind=? AND (? IS NOT NULL AND lower(s.sheet_name)=lower(?) OR ? IS NULL AND s.is_primary=1)
       )
       SELECT model,color,storage_gb,price_eur,scanned_at,filename,source_url,model_key,color_key
       FROM ranked WHERE rn=1 ORDER BY model,storage_gb,color
-    """, (kind,))
+    """, (kind, sheet_name, sheet_name, sheet_name))
 
-def history(kind, model_key, storage_gb, color_key=None):
+def history(kind, model_key, storage_gb, color_key=None, sheet_name=None):
     query = """SELECT s.scanned_at,p.price_eur,p.color,s.filename,s.source_url
       FROM prices p JOIN snapshots s ON s.id=p.snapshot_id
-      WHERE s.kind=? AND p.model_key=? AND p.storage_gb=?"""
-    args = [kind, model_key, int(storage_gb)]
+      WHERE s.kind=? AND p.model_key=? AND p.storage_gb=?
+        AND (? IS NOT NULL AND lower(s.sheet_name)=lower(?) OR ? IS NULL AND s.is_primary=1)"""
+    args = [kind, model_key, int(storage_gb), sheet_name, sheet_name, sheet_name]
     if color_key:
         query += " AND p.color_key=?"
         args.append(color_key)
@@ -220,8 +240,8 @@ def history(kind, model_key, storage_gb, color_key=None):
     return frame(query, tuple(args))
 
 def snapshots():
-    return frame("""SELECT s.kind,s.scanned_at,s.filename,s.folder_name,s.sheet_name,
-       s.record_count,s.source_url,s.imported_at FROM snapshots s
+    return frame("""SELECT s.kind,s.source_id,s.scanned_at,s.filename,s.folder_name,s.sheet_name,
+       s.is_primary,s.record_count,s.source_url,s.imported_at FROM snapshots s
        ORDER BY s.scanned_at DESC,s.id DESC""")
 
 def jobs():
