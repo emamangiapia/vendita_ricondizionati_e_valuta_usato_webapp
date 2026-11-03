@@ -9,7 +9,7 @@ git clone https://github.com/emamangiapia/vendita_ricondizionati_e_valuta_usato_
 cd vendita_ricondizionati_e_valuta_usato_webapp
 py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m streamlit run app.py
+.\.venv\Scripts\python.exe -m streamlit run app.py --server.address 127.0.0.1
 ```
 
 L'applicazione cerca automaticamente le altre repository nella directory GitHub sorella (anche `calcola_acquista_usato/calcola_acquista_usato`). Si possono specificare percorsi personalizzati attraverso le variabili `WEFIX_SALES_REPO`, `WEFIX_TRADE_REPO`.
@@ -26,7 +26,7 @@ Cartelle:
 - Vendita: `1jexJNN-jIRLlvpBTziZpZl8bsxf4kuGf`
 - Valuta usato: `1Nf6CCKSisap6NXv9Fs0T0iSrBVplua8C`
 
-L'importer visita tutte le sottocartelle paginando i risultati, sceglie il listino principale per ciascuna estrazione e conserva modello, colore, memoria, prezzo, data, file e foglio originali. È riavviabile senza duplicare gli stessi file/fogli. Elabora fogli Google nativi e, in fallback, XLSX. Per il ricondizionato preferisce il foglio `Apple` (media IQR clean) e per l'usato il foglio `Apple` (valutazione finale). I file individuali dei fornitori restano in Drive, non vengono aggregati impropriamente.
+L'importer visita tutte le sottocartelle paginando i risultati, sceglie il file migliore per ciascuna estrazione, **importa tutti i fogli di prezzo** (Apple, operatori, minimo, massimo e statistiche) e conserva modello, colore, memoria, prezzo, data, file e foglio originali. È riavviabile senza duplicare gli stessi file/fogli. Elabora fogli Google nativi e, in fallback, XLSX. Per il ricondizionato preferisce il foglio `Apple` (media IQR clean) e per l'usato il foglio `Apple` (valutazione finale). I file individuali dei fornitori restano in Drive, non vengono aggregati impropriamente.
 
 ## Esecuzioni e database
 
