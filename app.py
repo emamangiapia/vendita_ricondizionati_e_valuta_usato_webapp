@@ -45,8 +45,8 @@ def money(v):
 def date_short(value):
     return str(value).replace("T", " ")[:16] if value else "N/D"
 
-def load_latest(kind):
-    return latest_prices(kind)
+def load_latest(kind, sheet=None):
+    return latest_prices(kind, sheet_name=sheet)
 
 def start(action):
     allowed = {"sale", "trade_all", "import_history",
@@ -70,7 +70,12 @@ def start(action):
         st.error(f"Avvio non riuscito: {exc}")
 
 def view_prices(kind):
-    items = load_latest(kind)
+    available = snapshots()
+    available = available[available.kind == kind]
+    sheets = available.sheet_name.drop_duplicates().tolist() if not available.empty else []
+    sheets = sorted(sheets, key=lambda x:(x.casefold() != "apple", x))
+    chosen_sheet = st.selectbox("Fonte o indicatore del prezzo", sheets, index=0) if sheets else None
+    items = load_latest(kind, chosen_sheet)
     if items.empty:
         st.info("Nessun dato importato. Nella scheda Esecuzioni premi 'Importa storico Drive'.")
         return
@@ -100,9 +105,9 @@ def view_prices(kind):
     st.download_button("Esporta listino filtrato (CSV)",data.to_csv(index=False).encode("utf-8-sig"),
                        file_name=f"wefix_{kind}_prezzi.csv",mime="text/csv")
     if color != "Tutti i colori":
-        series = history(kind,opts.iloc[0].model_key,gb,subset.iloc[0].color_key)
+        series = history(kind,opts.iloc[0].model_key,gb,subset.iloc[0].color_key,sheet_name=chosen_sheet)
     else:
-        series = history(kind,opts.iloc[0].model_key,gb)
+        series = history(kind,opts.iloc[0].model_key,gb,sheet_name=chosen_sheet)
         if not series.empty:
             series = series.groupby("scanned_at",as_index=False)["price_eur"].median()
     if not series.empty:
@@ -154,15 +159,16 @@ def historical():
         st.info("Lo storico è vuoto.")
         return
     a,b,c=st.columns(3)
-    a.metric("Scarichi archiviati",len(df))
-    b.metric("Listini vendita",int((df.kind=="sale").sum()))
-    c.metric("Listini usato",int((df.kind=="tradein").sum()))
+    a.metric("Scarichi archiviati",df[["kind","source_id"]].drop_duplicates().shape[0])
+    b.metric("Listini vendita",df[df.kind=="sale"].source_id.nunique())
+    c.metric("Listini usato",df[df.kind=="tradein"].source_id.nunique())
     category=st.radio("Tipologia",["Tutte","Vendita ricondizionati","Valuta usato"],horizontal=True)
     if category!="Tutte":
         df=df[df.kind==("sale" if category=="Vendita ricondizionati" else "tradein")]
     st.dataframe(df.rename(columns={
         "kind":"Tipo","scanned_at":"Data scarico","filename":"File",
-        "folder_name":"Cartella Drive","sheet_name":"Foglio",
+        "folder_name":"Cartella Drive","sheet_name":"Foglio","source_id":"ID sorgente",
+        "is_primary":"Principale",
         "record_count":"Prezzi letti","source_url":"Link origine","imported_at":"Importato il"
     }),hide_index=True,use_container_width=True,
         column_config={"Link origine":st.column_config.LinkColumn("Link origine")})
@@ -239,14 +245,14 @@ if page=="Panoramica":
                 unsafe_allow_html=True)
     snapshots_df=snapshots()
     c1,c2,c3=st.columns(3)
-    c1.metric("Totale estrazioni",len(snapshots_df))
-    c2.metric("Scarichi ricondizionati",int((snapshots_df.kind=="sale").sum()) if not snapshots_df.empty else 0)
-    c3.metric("Scarichi valutazioni",int((snapshots_df.kind=="tradein").sum()) if not snapshots_df.empty else 0)
+    c1.metric("Totale estrazioni",snapshots_df[["kind","source_id"]].drop_duplicates().shape[0] if not snapshots_df.empty else 0)
+    c2.metric("Scarichi ricondizionati",snapshots_df[snapshots_df.kind=="sale"].source_id.nunique() if not snapshots_df.empty else 0)
+    c3.metric("Scarichi valutazioni",snapshots_df[snapshots_df.kind=="tradein"].source_id.nunique() if not snapshots_df.empty else 0)
     if not snapshots_df.empty:
         st.subheader("Ultime rilevazioni")
-        st.dataframe(snapshots_df.head(12)[["kind","scanned_at","filename","record_count"]],
+        st.dataframe(snapshots_df[snapshots_df.is_primary==1].head(12)[["kind","scanned_at","filename","record_count"]],
                      hide_index=True,use_container_width=True)
-        timeline=snapshots_df.copy()
+        timeline=snapshots_df[snapshots_df.is_primary==1].copy()
         timeline["mese"]=timeline.scanned_at.astype(str).str.slice(0,7)
         plotted=timeline.groupby(["mese","kind"]).size().unstack(fill_value=0)
         st.subheader("Frequenza delle estrazioni")
