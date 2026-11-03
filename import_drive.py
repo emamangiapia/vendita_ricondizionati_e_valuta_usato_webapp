@@ -140,9 +140,6 @@ def run(kind=None, limit=0):
             if not selected:
                 continue
             file_id = selected["id"]
-            if seen(category, file_id):
-                stats["skipped"] += 1
-                continue
             filename = selected["name"]
             run_at = parse_scanned_at(folder_name if folder_name != "root" else filename,
                                        fallback=selected.get("createdTime"))
@@ -159,12 +156,12 @@ def run(kind=None, limit=0):
                         result = import_rows(rows, kind=category,
                             source_id=file_id, filename=filename,
                             sheet_name=tab, scanned_at=run_at,
-                            folder_name=folder_name, source_url=source_url)
+                            folder_name=folder_name, source_url=source_url,
+                            is_primary=(tab.casefold()=="apple" or not imported))
                         imported = True
                         stats["prices"] += result["count"]
                         stats[result["status"]] += 1
-                        print(f"[OK] {category} | {folder_name} | {tab} | {result['count']} prezzi",flush=True)
-                        break
+                        print(f"[OK] {category} | {folder_name} | {tab} | {result['count']} prezzi ({result['status']})",flush=True)
                     except ValueError as err:
                         last_error = str(err)
                 if not imported:
