@@ -45,6 +45,8 @@ def start(action):
     except RuntimeError as exc:
         st.warning(f"{exc} Attendi il completamento e controlla stato e log nel registro dei processi in fondo alla pagina.")
         return
+    st.session_state["live_job_id"] = job_id
+    st.session_state["live_job_action"] = action
     cmd = [sys.executable, str(BASE_DIR / "job_runner.py"), str(job_id)]
     kwargs = {"cwd":str(BASE_DIR), "stdin":subprocess.DEVNULL,
               "stdout":subprocess.DEVNULL, "stderr":subprocess.DEVNULL}
@@ -54,10 +56,45 @@ def start(action):
         kwargs["start_new_session"] = True
     try:
         subprocess.Popen(cmd, **kwargs)
-        st.success(f"Esecuzione avviata, job #{job_id}. Consulta il registro per log e stato.")
+        st.success(f"Esecuzione avviata, job #{job_id}. Il log compare qui sotto.")
     except Exception as exc:
         update_job(job_id,status="failed",exit_code=1,error=str(exc))
         st.error(f"Avvio non riuscito: {exc}")
+
+
+@st.fragment(run_every="2s")
+def live_log(job_id):
+    """Aggiorna solo il pannello del job, senza rilanciare i pulsanti."""
+    records = jobs()
+    selected = records[records.id == job_id]
+    if selected.empty:
+        st.warning("Esecuzione non trovata nel registro.")
+        return
+    row = selected.iloc[0]
+    labels = {"queued": "In attesa", "running": "In corso", "completed": "Completata", "failed": "Fallita"}
+    status = str(row.status)
+    st.markdown(f"**Esecuzione #{job_id} · {labels.get(status, status)}**")
+    if status in ("queued", "running"):
+        st.caption("Aggiornamento automatico ogni 2 secondi · ultime righe del log")
+    elif status == "failed":
+        detail = row.error if pd.notna(row.error) and row.error else "consulta il log per i dettagli"
+        st.error(f"Esecuzione fallita: {detail}")
+    else:
+        st.caption("Esecuzione terminata · ultime righe del log")
+    path = Path(str(row.log_file))
+    if path.is_file():
+        with path.open("rb") as log:
+            log.seek(0, os.SEEK_END)
+            log.seek(max(0, log.tell() - 16000))
+            text = log.read().decode("utf-8", errors="replace")
+        st.code("\n".join(text.splitlines()[-15:]) or "In attesa dei primi messaggi…", language=None, height=300)
+    else:
+        st.info("In attesa dei primi messaggi del processo…")
+
+
+def show_live_log(*actions):
+    if st.session_state.get("live_job_action") in actions:
+        live_log(st.session_state["live_job_id"])
 
 def view_prices(kind):
     available = snapshots()
@@ -171,6 +208,7 @@ def executions():
     st.write("Avvia **scaper_trovaprezzi.py** tramite la .venv della sua repository. Al termine crea Excel, carica su Drive e aggiorna SQLite.")
     if st.button("Avvia scraper vendita ricondizionati",type="primary",key="sale"):
         start("sale")
+    show_live_log("sale")
     st.divider()
     st.subheader("Valuta usato")
     steps=[
@@ -184,14 +222,17 @@ def executions():
             with col:
                 if st.button(label,key=action,use_container_width=True):
                     start(action)
+        show_live_log(*(action for _, action in steps[i:i+3]))
     st.write("La pipeline completa si interrompe al primo errore. Lo step 5 aggiorna il database e lo step 6 mantiene l'invio email esistente.")
     if st.button("Avvia tutta la pipeline usato (1 → 6)",type="primary",key="trade_all"):
         start("trade_all")
+    show_live_log("trade_all")
     st.divider()
     st.subheader("Importa tutti gli scarichi storici")
     st.write("Importa entrambi gli archivi Drive, conserva le date e ignora i file già acquisiti. Richiede credenziali locali.")
     if st.button("Importa storico Drive",key="import_history"):
         start("import_history")
+    show_live_log("import_history")
     st.caption("Credentials: "+("configurate" if os.getenv("WEFIX_GOOGLE_CREDENTIALS") or os.getenv("GOOGLE_APPLICATION_CREDENTIALS") else "rilevamento automatico nei progetti esistenti"))
     st.divider()
     st.subheader("Registro dei processi")
