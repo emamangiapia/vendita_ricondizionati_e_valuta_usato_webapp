@@ -19,23 +19,9 @@ from storage import (
 
 st.set_page_config(page_title="WeFix | Price Intelligence",
                    page_icon="📱", layout="wide", initial_sidebar_state="expanded")
-st.markdown("""
-<style>
-  .stApp { background:#f8faf5; }
-  [data-testid="stSidebar"] {background:#f0f5e8;}
-  h1,h2,h3 {letter-spacing:-.035em;}
-  h1 {color:#21350e; font-weight:780;}
-  [data-testid="stMetric"] {background:white; border:1px solid #e4eadc;
-    border-radius:14px; padding:18px 20px;}
-  .brand-subtitle {color:#617058; margin-top:-8px;margin-bottom:24px;}
-  .hero {padding:20px 24px;border-radius:16px;
-    background:linear-gradient(110deg,#26460a,#6A9B14);color:white;margin:4px 0 26px 0;}
-  .hero h2 {color:white;margin:0;font-weight:760;}
-  .hero p {opacity:.88;margin:8px 0 0 0;}
-  .small-note {color:#57665a;font-size:0.89rem;}
-  div.stButton > button[kind="primary"] {background:#6A9B14;border-color:#6A9B14;}
-</style>
-""", unsafe_allow_html=True)
+# Streamlit non usa componenti React: applichiamo i token del kit ai widget nativi.
+style = (Path(__file__).resolve().parent / "assets" / "wefix-streamlit.css").read_text(encoding="utf-8-sig")
+st.markdown(f"<style>{style}</style>", unsafe_allow_html=True)
 
 init_db()
 
@@ -228,16 +214,16 @@ def executions():
     if st.button("Aggiorna stati e log",key="refresh"):
         st.rerun()
 
-st.sidebar.markdown("## 📱 WeFix")
-st.sidebar.caption("PRICE INTELLIGENCE · LOCALE")
+st.sidebar.markdown(
+    '<div class="brand-logo"><span class="brand-mark" aria-hidden="true">✦</span>'
+    '<span>WeFix<span class="brand-dot">.it</span></span></div>'
+    '<div class="brand-caption">PRICE INTELLIGENCE</div>', unsafe_allow_html=True)
 page=st.sidebar.radio("Navigazione",[
     "Panoramica","Prezzi ricondizionati","Valuta usato","Confronto prezzi",
     "Storico scarichi","Esecuzioni"
 ],label_visibility="collapsed")
 st.sidebar.divider()
-st.sidebar.caption("Archivio locale SQLite")
-st.sidebar.code(str(DATABASE_PATH),language=None)
-st.sidebar.caption("Accesso previsto solo da localhost.")
+st.sidebar.caption("● Archivio locale · accesso da questo dispositivo")
 
 st.title("WeFix · Price Intelligence")
 st.markdown('<p class="brand-subtitle">Osservatorio prezzi, valutazioni e raccolte storiche degli iPhone</p>',

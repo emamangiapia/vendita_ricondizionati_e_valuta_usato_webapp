@@ -47,3 +47,7 @@ Gli script cercano la webapp in una cartella sorella oppure usano `WEFIX_WEBAPP_
 3. Import dello storico e confronto dei conteggi con i file originali.
 4. Un'esecuzione completa per ciascuna pipeline con verifica di Excel, Drive, SQLite e invio email.
 5. Eventuali differenze tra gli ambienti e fogli XLSX storici non conformi.
+
+## Interfaccia WeFix
+
+La dashboard Streamlit adatta i token e i modelli visivi del kit `wefix-ui-ux-kit` 0.1.0 in `assets/wefix-streamlit.css` e `.streamlit/config.toml`. I componenti del kit sono React e non sono importabili direttamente nei widget Streamlit; l'adattamento va aggiornato quando cambiano i token del kit. I controlli e la navigazione restano widget Streamlit nativi.
