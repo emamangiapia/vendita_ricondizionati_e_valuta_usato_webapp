@@ -66,6 +66,7 @@ def main(job_id):
     error = None
     update_job(job_id, status="running", pid=os.getpid())
     env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"
     env["WEFIX_DB_PATH"] = str(DATABASE_PATH.resolve())
     env["WEFIX_WEBAPP_HOME"] = str(BASE_DIR.resolve())
     try:

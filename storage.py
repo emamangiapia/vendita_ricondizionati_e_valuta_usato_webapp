@@ -256,6 +256,7 @@ def jobs():
 def new_job(action, log_file):
     init_db()
     with connection() as db:
+        db.execute("BEGIN IMMEDIATE")
         running = db.execute("SELECT id FROM jobs WHERE status IN ('queued','running') LIMIT 1").fetchone()
         if running:
             raise RuntimeError(f"Un'altra esecuzione è in corso (ID {running['id']}).")

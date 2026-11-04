@@ -54,7 +54,11 @@ def start(action):
     if action not in allowed:
         raise ValueError("Azione non autorizzata")
     logfile = BASE_DIR / "data" / "jobs" / f"{int(time.time()*1000)}_{action}.log"
-    job_id = new_job(action, logfile)
+    try:
+        job_id = new_job(action, logfile)
+    except RuntimeError as exc:
+        st.warning(f"{exc} Attendi il completamento e controlla stato e log nel registro dei processi in fondo alla pagina.")
+        return
     cmd = [sys.executable, str(BASE_DIR / "job_runner.py"), str(job_id)]
     kwargs = {"cwd":str(BASE_DIR), "stdin":subprocess.DEVNULL,
               "stdout":subprocess.DEVNULL, "stderr":subprocess.DEVNULL}

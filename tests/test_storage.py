@@ -36,6 +36,14 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(s.storage_to_gb("2 TB"),2048)
         self.assertEqual(s.storage_to_gb("256 GB"),256)
 
+    def test_running_job_blocks_new_job_until_finished(self):
+        s = self.storage
+        job = s.new_job("sale", "sale.log")
+        with self.assertRaisesRegex(RuntimeError, f"ID {job}"):
+            s.new_job("trade_1", "trade.log")
+        s.update_job(job, status="completed", exit_code=0)
+        self.assertNotEqual(job, s.new_job("trade_1", "trade.log"))
+
     def test_timestamp_folder_formats(self):
         s = self.storage
         self.assertEqual(s.parse_scanned_at("run_20261030_113056"),"2026-10-30T11:30:56")
