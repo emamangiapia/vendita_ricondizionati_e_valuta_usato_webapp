@@ -5,12 +5,14 @@ import os
 import re
 import sqlite3
 import hashlib
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_PATH = Path(os.environ.get("WEFIX_DB_PATH") or BASE_DIR / "data" / "wefix_prices.sqlite3").expanduser()
 
+@contextmanager
 def connection():
     DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DATABASE_PATH, timeout=40)
@@ -18,7 +20,11 @@ def connection():
     conn.execute("PRAGMA busy_timeout=40000")
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
-    return conn
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 def init_db():
     with connection() as db:
