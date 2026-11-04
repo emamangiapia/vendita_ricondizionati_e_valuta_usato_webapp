@@ -54,7 +54,7 @@ def list_children(drive, parent_id):
             fields="nextPageToken,files(id,name,mimeType,createdTime,webViewLink,parents)",
             pageSize=1000, pageToken=token,
             supportsAllDrives=True, includeItemsFromAllDrives=True,
-        ).execute()
+        ).execute(num_retries=8)
         yield from response.get("files", [])
         token = response.get("nextPageToken")
         if not token:
@@ -78,7 +78,7 @@ def choose_file(files, kind):
 def native_sheet(drive_sheets, file_id):
     result = drive_sheets.spreadsheets().get(
         spreadsheetId=file_id, fields="sheets(properties(title))"
-    ).execute()
+    ).execute(num_retries=8)
     tabs = [x["properties"]["title"] for x in result.get("sheets", [])]
     if not tabs:
         raise ValueError("Google Sheet senza fogli")
@@ -89,7 +89,7 @@ def native_sheet(drive_sheets, file_id):
             spreadsheetId=file_id,
             range=f"'{safe}'!A1:AZ5000",
             valueRenderOption="UNFORMATTED_VALUE",
-        ).execute()
+        ).execute(num_retries=8)
         rows = result.get("values", [])
         if rows:
             yield tab, rows
@@ -102,7 +102,7 @@ def xlsx_sheet(drive, file_id):
     downloader = MediaIoBaseDownload(buf, request)
     finished = False
     while not finished:
-        _, finished = downloader.next_chunk()
+        _, finished = downloader.next_chunk(num_retries=8)
     buf.seek(0)
     wb = load_workbook(buf, read_only=True, data_only=True)
     try:
