@@ -118,7 +118,9 @@ def seen(kind, file_id):
            WHERE kind=? AND source_id=? AND record_count>0 LIMIT 1""", (kind,file_id)).fetchone() is not None
 
 def run(kind=None, limit=0):
-    init_db()
+    remote = bool(os.environ.get('WEFIX_DB_API_URL'))
+    if not remote:
+        init_db()
     drive, sheets = build_services()
     stats = {"folders":0,"imported":0,"skipped":0,"failed":0,"prices":0}
     kinds = [kind] if kind else list(DRIVE_ROOTS)
@@ -153,11 +155,16 @@ def run(kind=None, limit=0):
                 last_error = None
                 for tab, rows in tabs:
                     try:
-                        result = import_rows(rows, kind=category,
+                        payload = dict(rows=rows, kind=category,
                             source_id=file_id, filename=filename,
                             sheet_name=tab, scanned_at=run_at,
                             folder_name=folder_name, source_url=source_url,
                             is_primary=(tab.casefold()=="apple" or not imported))
+                        if remote:
+                            from ingest import post_api
+                            result = post_api('/ingest-rows', payload)
+                        else:
+                            result = import_rows(**payload)
                         imported = True
                         stats["prices"] += result["count"]
                         stats[result["status"]] += 1

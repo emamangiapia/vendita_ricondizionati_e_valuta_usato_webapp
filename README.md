@@ -1,53 +1,19 @@
-# WeFix | Osservatorio Ricondizionati e Valuta Usato
+# WeFix · Prezzi e usato
 
-Dashboard **locale** per lo storico dei prezzi di vendita dei ricondizionati, le valutazioni dell'usato e l'avvio controllato degli scraper. La repository contiene solo codice. **Il database, i file esportati e le credenziali non devono essere pubblicati**.
+Dashboard React per Railway Locale, con archivio SQLite persistente e agente Windows per gli scraper. Il catalogo Lavoro richiede la sessione del proprietario; non è previsto un link cliente pubblico. Gli scraper usano i propri `.venv`, browser e percorsi Windows esistenti.
 
-## Avvio su Windows
+## Funzionamento
 
-```powershell
-git clone https://github.com/emamangiapia/vendita_ricondizionati_e_valuta_usato_webapp.git
-cd vendita_ricondizionati_e_valuta_usato_webapp
-py -3 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m streamlit run app.py --server.address 127.0.0.1
-```
+Il servizio Docker contiene interfaccia, API e database nel volume `wefix-prices-data`. L'agente Windows preleva i soli comandi consentiti dalla coda tramite API con token, li esegue sul PC e trasmette stato e log. Nessuno script viene avviato automaticamente all'installazione. L'importazione dello storico e i due scraper inviano i listini tramite l'API usando `WEFIX_DB_API_URL` e `WEFIX_DB_API_TOKEN`; se non configurati, l'ingestione mantiene il vecchio SQLite locale. L'API remota richiede HTTPS, salvo loopback. La migrazione futura a un database online richiederà un servizio compatibile e un trasferimento dati dedicato.
 
-L'applicazione cerca automaticamente le altre repository nella directory GitHub sorella (anche `calcola_acquista_usato/calcola_acquista_usato`). Si possono specificare percorsi personalizzati attraverso le variabili `WEFIX_SALES_REPO`, `WEFIX_TRADE_REPO`.
+## Installazione iniziale
 
-## Importazione integrale dello storico Google Drive
+1. Pubblicare il commit sul branch `local` e assicurarsi che non ci siano esecuzioni attive.
+2. Dal checkout di sviluppo pubblicato eseguire `prepare_local.ps1`: crea una copia coerente del database e dei log in `apps/data/wefix-prices/incoming` e, se assente, la configurazione privata in `apps/secrets/wefix-prices.env`. Non sovrascrive archivio o credenziali.
+3. Registrare e distribuire dal controller Railway Locale, usando il codice GitHub pubblicato. Il primo avvio ripristina la copia nel volume solo se il database non esiste già; senza copia si arresta.
+4. Dal commit distribuito eseguire `install_agent.ps1`: installa un ambiente dedicato e un'attività Windows interattiva all'accesso. L'agente parte solo sul PC locale. Eventuali CAPTCHA o finestre richiedono la sessione Windows dell'utente.
+5. Confrontare conteggi, log, permessi e accessi LAN/ngrok prima di dismettere l'eventuale vecchia dashboard.
 
-Configurare `WEFIX_GOOGLE_CREDENTIALS` con il percorso locale di un JSON di **service account autorizzato a leggere entrambe le cartelle**. Nei progetti scraper esistono già service account, ma occorre verificare le autorizzazioni specifiche. Poi premere **Importa storico Drive** nella scheda **Esecuzioni** oppure:
+## Verifica
 
-```powershell
-.\.venv\Scripts\python.exe import_drive.py
-```
-
-Cartelle:
-- Vendita: `1jexJNN-jIRLlvpBTziZpZl8bsxf4kuGf`
-- Valuta usato: `1Nf6CCKSisap6NXv9Fs0T0iSrBVplua8C`
-
-L'importer visita tutte le sottocartelle paginando i risultati, sceglie il file migliore per ciascuna estrazione, **importa tutti i fogli di prezzo** (Apple, operatori, minimo, massimo e statistiche) e conserva modello, colore, memoria, prezzo, data, file e foglio originali. È riavviabile senza duplicare gli stessi file/fogli. Elabora fogli Google nativi e, in fallback, XLSX. Per il ricondizionato preferisce il foglio `Apple` (media IQR clean) e per l'usato il foglio `Apple` (valutazione finale). I file individuali dei fornitori restano in Drive, non vengono aggregati impropriamente.
-
-## Esecuzioni e database
-
-- `data/wefix_prices.sqlite3`: SQLite locale (schema creato automaticamente), **escluso da Git**.
-- Pulsanti per il singolo scraper ricondizionati, 6 step valuta-usato e pipeline completa.
-- I subprocess usano l'interprete `.venv` **della rispettiva repository** e partono con `cwd` corretto, senza `shell=True`. I log sono in `data/jobs/`.
-- Inserimento nel DB alla fine del flusso di ogni scraper (incluso in un commit separato sulle branch `new_scraper_v2` e `nuovi_sviluppi`). Gli errori del DB non cancellano i file già esportati; i log li espongono.
-- La colonna differenziale (vendita meno valutazione usato) è **uno spread indicativo, non un margine netto**, perché non considera ricondizionamento, IVA, trasporto, commissioni, garanzie e condizioni del dispositivo.
-- L'applicazione è intesa per `localhost`: non esporla su Internet senza autenticazione e protezioni per gli endpoint di esecuzione.
-
-## Collegamento SQLite nei progetti scraper
-
-Gli script cercano la webapp in una cartella sorella oppure usano `WEFIX_WEBAPP_HOME`. Variabile facoltativa `WEFIX_DB_PATH` per scegliere una diversa directory SQLite locale.
-
-### Da verificare sul PC con Codex
-1. Posizione effettiva delle tre clone, presenza delle `.venv` e dipendenze.
-2. Permessi di lettura di entrambe le cartelle Drive per il service account.
-3. Import dello storico e confronto dei conteggi con i file originali.
-4. Un'esecuzione completa per ciascuna pipeline con verifica di Excel, Drive, SQLite e invio email.
-5. Eventuali differenze tra gli ambienti e fogli XLSX storici non conformi.
-
-## Interfaccia WeFix
-
-La dashboard Streamlit adatta i token e i modelli visivi del kit `wefix-ui-ux-kit` 0.1.0 in `assets/wefix-streamlit.css` e `.streamlit/config.toml`. I componenti del kit sono React e non sono importabili direttamente nei widget Streamlit; l'adattamento va aggiornato quando cambiano i token del kit. I controlli e la navigazione restano widget Streamlit nativi.
+`python -m unittest discover -s tests -v` esegue le prove API, coda e migrazione con dati temporanei. `npm ci && npm run build` in `frontend` verifica la compilazione. I componenti React in `frontend/vendor/wefix` provengono dalla repo `wefix-ui-ux-kit`, commit `dd6586149914782e9e3c27bba9e591586f60212d`; sono soggetti alla licenza del kit. Database, file Excel, token, log e credenziali rimangono fuori da Git.

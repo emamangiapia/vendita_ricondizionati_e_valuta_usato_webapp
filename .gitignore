@@ -18,3 +18,8 @@ output_*/
 token*.pickle
 credentials*.json
 service_account*.json
+
+!frontend/package.json
+!frontend/package-lock.json
+frontend/node_modules/
+frontend/dist/

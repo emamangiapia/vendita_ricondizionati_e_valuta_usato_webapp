@@ -68,6 +68,10 @@ def init_db():
           pid INTEGER,
           error TEXT
         );
+        CREATE TABLE IF NOT EXISTS job_inputs (
+          job_id INTEGER PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE,
+          pending INTEGER NOT NULL DEFAULT 0 CHECK(pending IN (0,1))
+        );
         """)
         columns = {r[1] for r in db.execute("PRAGMA table_info(snapshots)")}
         if "is_primary" not in columns:
