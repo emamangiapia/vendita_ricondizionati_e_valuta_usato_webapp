@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent / '.env')
 import storage
+import price_catalog
 import queue_store
 from job_runner import SCRIPTS_TRADE
 
@@ -77,6 +78,17 @@ def handler_for(token, ingest_token=None, agent_token=None):
                     kind = query.get('kind', [''])[0]
                     if kind not in ('sale','tradein'): raise ValueError('Tipo non valido')
                     return self.reply(200, records(storage.latest_prices(kind, query.get('sheet', [None])[0])))
+                if parsed.path == '/catalog':
+                    kind=query.get('kind',[''])[0]
+                    storage.init_db()
+                    with storage.connection() as db: result=price_catalog.list_catalog(db,kind)
+                    return self.reply(200,result)
+                if parsed.path == '/catalog/notifications':
+                    actor=query.get('actor',[''])[0]
+                    if not actor or len(actor)>40: raise ValueError('operatore non valido')
+                    storage.init_db()
+                    with storage.connection() as db: result=price_catalog.notifications(db,actor)
+                    return self.reply(200,result)
                 if parsed.path == '/history':
                     kind = query.get('kind', [''])[0]
                     if kind not in ('sale','tradein'): raise ValueError('Tipo non valido')
@@ -102,6 +114,22 @@ def handler_for(token, ingest_token=None, agent_token=None):
                 return self.reply(400, {'error':'Parametri non validi'})
         def do_POST(self):
             if not self.authorised(): return
+            if self.path == '/catalog/action':
+                try:
+                    size=int(self.headers.get('Content-Length','0'))
+                    if not 0<size<=128*1024: raise ValueError('dimensione non valida')
+                    body=json.loads(self.rfile.read(size)); actor=body.get('actor')
+                    if not isinstance(actor,str) or not actor or len(actor)>40: raise ValueError('operatore non valido')
+                    storage.init_db()
+                    with storage.connection() as db:
+                        action=body.get('action')
+                        if action=='price': price_catalog.manual_price(db,body['price'],actor)
+                        elif action=='rules': price_catalog.rules(db,body['kind'],body['mode'],body.get('up_limit'),body.get('down_limit'))
+                        elif action=='decide': price_catalog.decide(db,body['ids'],body['decision'],actor)
+                        elif action=='read': price_catalog.mark_read(db,actor,body['ids'])
+                        else: raise ValueError('azione non valida')
+                    return self.reply(200,{'ok':True})
+                except (KeyError,TypeError,ValueError,json.JSONDecodeError): return self.reply(400,{'error':'Operazione non valida o proposta già modificata'})
             if self.path == '/ingest-rows':
                 try:
                     size=int(self.headers.get('Content-Length','0'))

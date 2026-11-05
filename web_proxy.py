@@ -4,15 +4,17 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from urllib.request import Request,urlopen
 from urllib.error import HTTPError,URLError
-import mimetypes,os
+import mimetypes,os,hmac
 
 ROOT=Path(__file__).resolve().parent/'frontend'/'dist'
 TOKEN=os.environ.get('WEFIX_API_TOKEN','')
+CATALOG_TOKEN=os.environ.get('WEFIX_CATALOG_TOKEN','')
 ALLOWED_GET={'/health','/snapshots','/prices','/history','/jobs'}
 class Handler(BaseHTTPRequestHandler):
     def log_message(self,*args): pass
     def do_GET(self):
         path=urlsplit(self.path).path
+        if path in ('/api/catalog','/api/catalog/notifications'): return self.catalog('GET')
         if path.startswith('/api/wefix/'):
             return self.proxy('GET')
         if path=='/health':
@@ -26,10 +28,23 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Cache-Control','no-store');self.send_header('X-Content-Type-Options','nosniff')
         self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
     def do_POST(self):
+        if urlsplit(self.path).path == '/api/catalog/action': return self.catalog('POST')
         origin=self.headers.get('Origin','')
         if not origin or urlsplit(origin).netloc != self.headers.get('Host',''):
             self.send_error(403);return
         return self.proxy('POST')
+    def catalog(self,method):
+        if len(CATALOG_TOKEN)<32 or not hmac.compare_digest(self.headers.get('Authorization',''),'Bearer '+CATALOG_TOKEN):
+            self.respond(401,b'{"error":"Non autorizzato"}'); return
+        size=int(self.headers.get('Content-Length','0'))
+        if size>128*1024: self.respond(413,b'{"error":"Richiesta troppo grande"}');return
+        body=self.rfile.read(size) if method=='POST' else None
+        path=self.path.removeprefix('/api')
+        req=Request('http://127.0.0.1:8766'+path,data=body,method=method,headers={'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json'})
+        try:
+            with urlopen(req,timeout=30) as result: self.respond(result.status,result.read())
+        except HTTPError as err: self.respond(err.code,err.read())
+        except URLError: self.respond(503,b'{"error":"Servizio dati non disponibile"}')
     def proxy(self,method):
         path=self.path.removeprefix('/api/wefix'); route=urlsplit(path).path
         if (method=='POST' and route!='/jobs' and not (route.startswith('/jobs/') and route.endswith('/continue'))) or (method=='GET' and route not in ALLOWED_GET and not (route.startswith('/jobs/') and route.endswith('/log'))):

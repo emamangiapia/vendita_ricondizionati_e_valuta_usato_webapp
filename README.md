@@ -6,6 +6,8 @@ Dashboard React per Railway Locale, con archivio SQLite persistente e agente Win
 
 Il servizio Docker contiene interfaccia, API e database nel volume `wefix-prices-data`. L'agente Windows preleva i soli comandi consentiti dalla coda tramite API con token, li esegue sul PC e trasmette stato e log. Nessuno script viene avviato automaticamente all'installazione. L'importazione dello storico e i due scraper inviano i listini tramite l'API usando `WEFIX_DB_API_URL` e `WEFIX_DB_API_TOKEN`; se non configurati, l'ingestione mantiene il vecchio SQLite locale. L'API remota richiede HTTPS, salvo loopback. La migrazione futura a un database online richiederà un servizio compatibile e un trasferimento dati dedicato.
 
+Il catalogo approvato, le proposte, le soglie e le notifiche condividono il database persistente senza sovrascrivere lo storico. L'Assistente si collega attraverso l'API dedicata protetta da `WEFIX_CATALOG_TOKEN`, distinto dai token degli scraper e della dashboard. La stessa chiave deve essere presente solo nelle configurazioni private dei due servizi. La prima inizializzazione usa i prezzi più recenti esistenti; le raccolte successive seguono le regole del backoffice. Non avviare l'inizializzazione prima di aver completato l'import storico iniziale.
+
 ## Installazione iniziale
 
 1. Pubblicare il commit sul branch `local` e assicurarsi che non ci siano esecuzioni attive.

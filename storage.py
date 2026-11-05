@@ -5,6 +5,7 @@ import os
 import re
 import sqlite3
 import hashlib
+import price_catalog
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -78,6 +79,7 @@ def init_db():
             db.execute("ALTER TABLE snapshots ADD COLUMN is_primary INTEGER NOT NULL DEFAULT 0")
         if "content_hash" not in columns:
             db.execute("ALTER TABLE snapshots ADD COLUMN content_hash TEXT")
+        price_catalog.init(db)
 
 def _clean(s):
     return re.sub(r"\s+", " ", str(s or "")).strip()
@@ -191,6 +193,8 @@ def import_rows(rows, *, kind, source_id, filename, sheet_name, scanned_at, fold
           (snapshot_id,model,model_key,color,color_key,storage_gb,price_eur)
           VALUES (?,?,?,?,?,?,?)""",
           [(snapshot_id,m,_key(m),c,_key(c),g,p) for m,c,g,p in records])
+        if db.execute('SELECT initialized FROM catalog_state WHERE kind=?',(kind,)).fetchone()['initialized']:
+            price_catalog.reconcile(db, kind)
     return {"status": "imported", "count": len(records), "snapshot_id": snapshot_id}
 
 def import_xlsx(path, *, kind, source_id=None, scanned_at=None, source_url="", folder_name=""):

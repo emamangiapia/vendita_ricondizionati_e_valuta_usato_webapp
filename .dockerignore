@@ -2,6 +2,7 @@
 !Dockerfile
 !requirements-container.txt
 !storage.py
+!price_catalog.py
 !queue_store.py
 !local_api.py
 !job_runner.py

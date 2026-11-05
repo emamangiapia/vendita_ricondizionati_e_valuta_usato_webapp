@@ -46,6 +46,17 @@ class ApiTests(unittest.TestCase):
     def test_rejects_short_token(self):
         with self.assertRaises(ValueError): handler_for('short')
 
+    def test_catalog_requires_token_and_applies_actions(self):
+        self.assertEqual(self.request('GET','/catalog?kind=sale')[0],401)
+        status, result = self.request('GET','/catalog?kind=sale',token=self.token)
+        self.assertEqual(status,200); self.assertEqual(result['rules']['mode'],'manual')
+        price={'kind':'sale','source':'principale','model':'iPhone 15','color':'Blu','storage_gb':128,'price':300}
+        body=json.dumps({'action':'price','actor':'walter','price':price})
+        self.assertEqual(self.request('POST','/catalog/action',body=body,token=self.token)[0],200)
+        status,result=self.request('GET','/catalog?kind=sale',token=self.token)
+        self.assertEqual(result['prices'][0]['approved'],300)
+        self.assertNotIn('observed_at',result['prices'][0])
+
     def test_credentials_are_scoped_to_each_role(self):
         ingest_token = 'i' * 32
         agent_token = 'a' * 32
