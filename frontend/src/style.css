@@ -17,3 +17,6 @@ aside small{display:block;margin-top:8px}.job-list{display:flex;flex-wrap:wrap;g
 .trend-tooltip { position:absolute; z-index:2; left:clamp(130px,var(--tip-x,50%),calc(100% - 130px)); transform:translate(-50%,-110%); pointer-events:none; display:grid; gap:4px; max-width:min(270px,90%); padding:10px 12px; border-radius:8px; background:#24371e; color:white; font-size:12px; box-shadow:0 4px 16px #0003; overflow-wrap:anywhere; }
 .trend-tooltip span { color:#e6efe1; }
 @media(max-width:600px){.trend-tooltip{font-size:11px}}
+.trend-legend {display:flex;flex-wrap:wrap;gap:12px 20px;list-style:none;padding:0;margin:12px 0 18px;color:var(--wfx-text)}
+.trend-legend li {display:flex;align-items:center;gap:7px;font-weight:650;font-size:13px}
+.trend-legend svg {flex:none}

@@ -25,3 +25,18 @@ export function buildTrend(rows) {
   }
   return [...grouped.values()].map(item=>({...item,value:item.total/item.count,files:[...item.files]})).sort((a,b)=>a.time-b.time);
 }
+
+export function buildTrendSeries(rows) {
+  const groups = new Map();
+  for (const row of rows) {
+    if (!Number.isInteger(row.storage_gb) || row.storage_gb <= 0) continue;
+    if (!groups.has(row.storage_gb)) groups.set(row.storage_gb, []);
+    groups.get(row.storage_gb).push(row);
+  }
+  return [...groups.entries()]
+    .sort(([a],[b]) => a-b)
+    .map(([storage,items]) => ({storage, points:buildTrend(items)}))
+    .filter(series => series.points.length);
+}
+
+export const formatStorage = gb => gb >= 1024 && gb % 1024 === 0 ? `${gb/1024} TB` : `${gb} GB`;
