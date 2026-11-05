@@ -3,3 +3,17 @@
 aside small{display:block;margin-top:8px}.job-list{display:flex;flex-wrap:wrap;gap:8px}.wfx-root{min-height:100vh}svg[role=img]{width:100%;max-height:240px}
 @media(hover:hover) and (pointer:fine){.wfx-button,nav button{transition:transform 140ms cubic-bezier(.23,1,.32,1),background-color 140ms ease}.wfx-button:hover,nav button:hover{transform:translateY(-2px)}}
 @media(prefers-reduced-motion:reduce){.wfx-button,nav button{transition:none!important;transform:none!important}}
+.trend-frame { background:var(--wfx-surface); border:1px solid var(--wfx-border); border-radius:12px; padding:12px; }
+.trend-scroll { overflow-x:auto; padding-top:64px; margin-top:-64px; }
+.trend-chart-canvas { position:relative; min-width:600px; }
+.trend-frame svg { display:block; width:100%; height:auto; overflow:visible; }
+.trend-grid { stroke:#e4e6e1; stroke-width:1; }
+.trend-baseline { stroke:#9aa398; stroke-width:1; }
+.trend-axis { fill:#515d50; font-size:11px; }
+.trend-line { fill:none; stroke:#4d7609; stroke-width:3; stroke-linejoin:round; stroke-linecap:round; }
+.trend-dot { fill:#4d7609; stroke:white; stroke-width:2; }
+.trend-frame g[role=button] { cursor:pointer; }
+.trend-frame g[role=button]:focus-visible { outline:2px solid #4d7609; }
+.trend-tooltip { position:absolute; z-index:2; left:clamp(130px,var(--tip-x,50%),calc(100% - 130px)); transform:translate(-50%,-110%); pointer-events:none; display:grid; gap:4px; max-width:min(270px,90%); padding:10px 12px; border-radius:8px; background:#24371e; color:white; font-size:12px; box-shadow:0 4px 16px #0003; overflow-wrap:anywhere; }
+.trend-tooltip span { color:#e6efe1; }
+@media(max-width:600px){.trend-tooltip{font-size:11px}}
