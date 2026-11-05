@@ -4,7 +4,7 @@ from pathlib import Path
 import time
 import storage
 
-ACTIONS = {'sale','trade_all','import_history', *(f'trade_{i}' for i in range(1,7))}
+ACTIONS = {'sale','trade_all','all_scrapers','import_history', *(f'trade_{i}' for i in range(1,7))}
 
 def enqueue(action):
     if action not in ACTIONS:

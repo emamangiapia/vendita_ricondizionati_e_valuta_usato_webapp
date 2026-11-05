@@ -38,6 +38,8 @@ def python_for(repo):
     raise FileNotFoundError(f"Ambiente .venv non trovato in {repo}")
 
 def commands(action):
+    if action == "all_scrapers":
+        return commands("sale") + commands("trade_all")
     if action == "import_history":
         return [(str(Path(sys.executable).resolve()), BASE_DIR / "import_drive.py", BASE_DIR)]
     if action == "sale":

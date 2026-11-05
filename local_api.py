@@ -20,7 +20,7 @@ import price_catalog
 import queue_store
 from job_runner import SCRIPTS_TRADE
 
-ACTIONS = {'sale', 'trade_all', 'import_history', *(f'trade_{i}' for i in range(1, 7))}
+ACTIONS = {'sale', 'trade_all', 'all_scrapers', 'import_history', *(f'trade_{i}' for i in range(1, 7))}
 
 def records(frame):
     return json.loads(frame.to_json(orient='records', date_format='iso', force_ascii=False))
