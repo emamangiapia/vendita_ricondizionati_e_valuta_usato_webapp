@@ -55,7 +55,9 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.request('POST','/agent/claim',body='{}',token=ingest_token)[0],401)
         self.assertEqual(self.request('POST','/agent/claim',body='{}',token=self.token)[0],401)
         self.assertEqual(self.request('POST','/ingest',body='{}',token=self.token)[0],401)
+        self.assertFalse(self.request('GET','/health',token=self.token)[1]['agent_online'])
         self.assertEqual(self.request('POST','/agent/claim',body='{}',token=agent_token)[0],200)
+        self.assertTrue(self.request('GET','/health',token=self.token)[1]['agent_online'])
 
     def test_ingest_requires_token_and_is_idempotent(self):
         from openpyxl import Workbook

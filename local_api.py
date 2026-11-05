@@ -45,6 +45,7 @@ def handler_for(token, ingest_token=None, agent_token=None):
     agent_token = token if agent_token is None else agent_token
     if any(not value or len(value) < 32 for value in (token,ingest_token,agent_token)):
         raise ValueError('I token WeFix devono contenere almeno 32 caratteri')
+    agent_seen = [0.0]
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
             pass
@@ -69,7 +70,7 @@ def handler_for(token, ingest_token=None, agent_token=None):
             query = parse_qs(parsed.query)
             try:
                 if parsed.path == '/health':
-                    return self.reply(200, {'ok': True})
+                    return self.reply(200, {'ok': True, 'agent_online':bool(agent_seen[0]) and time.monotonic()-agent_seen[0] < 15})
                 if parsed.path == '/snapshots':
                     return self.reply(200, records(storage.snapshots()))
                 if parsed.path == '/prices':
@@ -120,6 +121,7 @@ def handler_for(token, ingest_token=None, agent_token=None):
                     if not 0 < size <= 128 * 1024: raise ValueError('Dimensione non valida')
                     body = json.loads(self.rfile.read(size))
                     if not isinstance(body, dict): raise ValueError('Richiesta non valida')
+                    agent_seen[0] = time.monotonic()
                     if self.path == '/agent/claim' and not body:
                         return self.reply(200, {'job':queue_store.claim()})
                     if self.path == '/agent/log' and set(body) == {'id','text'} and type(body['id']) is int:
