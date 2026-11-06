@@ -49,6 +49,9 @@ def input_event(job_id, event):
     elif kind == 'key':
         if set(event) != {'type','key'} or event['key'] not in ('Tab','Enter','Space','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Backspace'):
             raise ValueError('Tasto non valido')
+    elif kind == 'text':
+        if set(event) != {'type','text'} or not isinstance(event['text'], str) or not 1 <= len(event['text']) <= 100 or any(ord(c) < 32 for c in event['text']):
+            raise ValueError('Testo non valido')
     elif kind == 'continue':
         if set(event) != {'type'}: raise ValueError('Comando non valido')
     else: raise ValueError('Comando non valido')

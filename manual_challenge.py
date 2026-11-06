@@ -30,6 +30,7 @@ def wait_for_verification(page):
                         page.mouse.move(event['x']*size['width'], event['y']*size['height'])
                         if kind == 'down': page.mouse.down()
                         if kind == 'up': page.mouse.up()
+                    elif kind == 'text': page.keyboard.insert_text(event['text'])
                     elif kind == 'key': page.keyboard.press(event['key'])
             except Exception as exc:
                 print('Collegamento verifica temporaneamente non disponibile: '+type(exc).__name__, flush=True)

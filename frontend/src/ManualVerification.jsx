@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 
 export default function ManualVerification({job,running,request}) {
- const [view,setView]=useState(null),[error,setError]=useState('');
+ const [view,setView]=useState(null),[error,setError]=useState(''),[text,setText]=useState('');
  const chain=useRef(Promise.resolve()),lastMove=useRef(0),pressed=useRef(false);
  useEffect(()=>{
   setView(null);setError('');if(!running)return;
@@ -24,6 +24,7 @@ export default function ManualVerification({job,running,request}) {
    style={{display:'block',width:'100%',touchAction:'none',border:'1px solid #ccc'}}
    onPointerDown={e=>pointer(e,'down')} onPointerMove={e=>pointer(e,'move')} onPointerUp={e=>pointer(e,'up')} onPointerCancel={e=>pointer(e,'up')}
    onKeyDown={e=>{const key=e.key===' '?'Space':e.key;if(['Tab','Enter','Space','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Backspace'].includes(key)){e.preventDefault();send({type:'key',key})}}}/>
+  <div><input aria-label="Testo della verifica" placeholder="Testo da inserire nella verifica" maxLength={100} value={text} onChange={e=>setText(e.target.value)}/><button disabled={!text} onClick={()=>{send({type:'text',text});setText('')}}>Inserisci testo</button></div>
   {error&&<p role="alert">{error}</p>}<button onClick={()=>send({type:'continue'})}>Verifica completata · Continua</button>
  </section>;
 }
