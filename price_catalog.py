@@ -4,16 +4,35 @@ import re
 import sqlite3
 
 KINDS = ('tradein', 'sale')
+DEFAULT_AUTOMATIC_LIMIT = 10.0
+AUTOMATIC_DEFAULT_MIGRATION = 'automatic_default_v1'
 
 def init(db):
     db.executescript('''
     CREATE TABLE IF NOT EXISTS catalog_state (kind TEXT PRIMARY KEY, initialized INTEGER NOT NULL DEFAULT 0, mode TEXT NOT NULL DEFAULT 'manual', up_limit REAL, down_limit REAL);
     CREATE TABLE IF NOT EXISTS catalog_prices (id INTEGER PRIMARY KEY, kind TEXT NOT NULL, source TEXT NOT NULL, model TEXT NOT NULL, model_key TEXT NOT NULL, color TEXT NOT NULL, color_key TEXT NOT NULL, storage_gb INTEGER NOT NULL, approved REAL, observed REAL, observed_at TEXT, observed_snapshot INTEGER, proposed REAL, dismissed REAL, UNIQUE(kind, source, model_key, color_key, storage_gb));
     CREATE TABLE IF NOT EXISTS catalog_events (id INTEGER PRIMARY KEY, price_id INTEGER NOT NULL REFERENCES catalog_prices(id), value REAL NOT NULL, status TEXT NOT NULL, actor TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, decided_at TEXT);
+    CREATE TABLE IF NOT EXISTS catalog_migrations (name TEXT PRIMARY KEY);
     CREATE TABLE IF NOT EXISTS catalog_notification_reads (event_id INTEGER NOT NULL REFERENCES catalog_events(id), actor TEXT NOT NULL, PRIMARY KEY(event_id, actor));
     ''')
     for kind in KINDS:
-        db.execute('INSERT OR IGNORE INTO catalog_state(kind) VALUES(?)', (kind,))
+        db.execute('INSERT OR IGNORE INTO catalog_state(kind, mode, up_limit, down_limit) VALUES(?, ?, ?, ?)', (kind, 'auto', DEFAULT_AUTOMATIC_LIMIT, DEFAULT_AUTOMATIC_LIMIT))
+    # Activate the requested default once, without overriding later manual choices.
+    if not db.execute('SELECT 1 FROM catalog_migrations WHERE name=?', (AUTOMATIC_DEFAULT_MIGRATION,)).fetchone():
+        db.execute("UPDATE catalog_state SET mode='auto', up_limit=?, down_limit=? WHERE mode='manual'", (DEFAULT_AUTOMATIC_LIMIT, DEFAULT_AUTOMATIC_LIMIT))
+        # Existing proposals inside the configured limits no longer need review.
+        pending = db.execute('''SELECT e.id AS event_id, e.price_id, e.value, p.approved, p.proposed,
+                                      s.up_limit, s.down_limit
+                               FROM catalog_events e JOIN catalog_prices p ON p.id=e.price_id
+                               JOIN catalog_state s ON s.kind=p.kind
+                               WHERE e.status='pending' AND s.mode='auto' AND p.approved > 0
+                                 AND p.proposed=e.value AND s.up_limit IS NOT NULL AND s.down_limit IS NOT NULL''').fetchall()
+        for row in pending:
+            delta = (row['value'] - row['approved']) / row['approved'] * 100
+            if -row['down_limit'] <= delta <= row['up_limit']:
+                db.execute('UPDATE catalog_prices SET approved=?, proposed=NULL, dismissed=NULL WHERE id=?', (row['value'], row['price_id']))
+                db.execute("UPDATE catalog_events SET status='auto', actor='automatico', decided_at=CURRENT_TIMESTAMP WHERE id=?", (row['event_id'],))
+        db.execute('INSERT INTO catalog_migrations(name) VALUES(?)', (AUTOMATIC_DEFAULT_MIGRATION,))
 
 def _key(value): return re.sub(r'\s+', ' ', value.strip()).casefold()
 def _valid_price(value): return type(value) in (float,int) and math.isfinite(value) and 0 < value < 100000

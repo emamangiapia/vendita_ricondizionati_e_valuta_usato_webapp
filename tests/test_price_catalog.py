@@ -13,6 +13,7 @@ class CatalogTests(unittest.TestCase):
     def ingest(self, value, stamp, src):
         self.storage.import_rows([['Modello','Colori','128 GB'],['iPhone 14','Blu',value]],kind='tradein',source_id=src,filename='x',sheet_name='swappie.com',scanned_at=stamp,is_primary=False)
     def test_baseline_manual_reject_and_auto(self):
+        with self.storage.connection() as db: self.catalog.rules(db,'tradein','manual',None,None)
         self.ingest(100,'2026-01-01','a')
         with self.storage.connection() as db:
             self.catalog.reconcile(db,'tradein'); self.assertEqual(db.execute('select approved from catalog_prices').fetchone()[0],100)
@@ -33,6 +34,57 @@ class CatalogTests(unittest.TestCase):
             self.assertEqual(tuple(db.execute('select approved,proposed from catalog_prices').fetchone()),(92,40))
             event=db.execute("select id from catalog_events where status='pending'").fetchone()[0]; self.catalog.decide(db,[event],'approve','emanuele')
             self.assertEqual(db.execute('select approved from catalog_prices').fetchone()[0],40)
+    def test_automatic_defaults_and_existing_manual_override(self):
+        with self.storage.connection() as db:
+            self.assertEqual(tuple(db.execute("select mode,up_limit,down_limit from catalog_state where kind='tradein'").fetchone()), ('auto',10,10))
+            self.catalog.rules(db,'tradein','manual',None,None)
+        self.storage.init_db()
+        with self.storage.connection() as db:
+            self.assertEqual(db.execute("select mode from catalog_state where kind='tradein'").fetchone()[0], 'manual')
+
+    def test_automatic_thresholds_and_new_product(self):
+        self.ingest(100,'2026-01-01','a')
+        with self.storage.connection() as db: self.catalog.reconcile(db,'tradein')
+        self.ingest(110,'2026-02-01','b')
+        with self.storage.connection() as db:
+            self.assertEqual(tuple(db.execute('select approved,proposed from catalog_prices').fetchone()), (110,None))
+        self.ingest(125,'2026-03-01','c')
+        with self.storage.connection() as db:
+            self.assertEqual(tuple(db.execute('select approved,proposed from catalog_prices').fetchone()), (110,125))
+            self.assertEqual(len(self.catalog.notifications(db,'walter')), 1)
+
+    def test_upgrade_approves_only_in_range_pending_once(self):
+        self.ingest(100,'2026-01-01','a')
+        with self.storage.connection() as db: self.catalog.reconcile(db,'tradein')
+        with self.storage.connection() as db:
+            self.catalog.rules(db,'tradein','manual',None,None)
+        self.ingest(105,'2026-02-01','b')
+        with self.storage.connection() as db:
+            db.execute('DELETE FROM catalog_migrations')
+        self.storage.init_db()
+        with self.storage.connection() as db:
+            self.assertEqual(tuple(db.execute('select approved,proposed from catalog_prices').fetchone()), (105,None))
+            self.assertEqual(db.execute("select count(*) from catalog_events where status='pending'").fetchone()[0], 0)
+            self.assertEqual(db.execute("select count(*) from catalog_events where status='auto'").fetchone()[0], 1)
+            self.catalog.rules(db,'tradein','manual',None,None)
+        self.storage.init_db()
+        with self.storage.connection() as db:
+            self.assertEqual(db.execute("select mode from catalog_state where kind='tradein'").fetchone()[0], 'manual')
+
+    def test_upgrade_keeps_anomalies_and_new_variants_pending(self):
+        self.ingest(100,'2026-01-01','a')
+        with self.storage.connection() as db:
+            self.catalog.reconcile(db,'tradein')
+            self.catalog.rules(db,'tradein','manual',None,None)
+        self.ingest(130,'2026-02-01','b')
+        self.storage.import_rows([['Modello','Colori','128 GB'],['iPhone 14','Rosso',50]],kind='tradein',source_id='c',filename='x',sheet_name='swappie.com',scanned_at='2026-03-01')
+        with self.storage.connection() as db: db.execute('DELETE FROM catalog_migrations')
+        self.storage.init_db()
+        with self.storage.connection() as db:
+            self.assertEqual(tuple(db.execute("select approved,proposed from catalog_prices where color='Blu'").fetchone()), (100,130))
+            self.assertEqual(tuple(db.execute("select approved,proposed from catalog_prices where color='Rosso'").fetchone()), (None,50))
+            self.assertEqual(len(self.catalog.notifications(db,'walter')), 2)
+
     def test_late_historical_import_does_not_roll_back(self):
         self.ingest(100,'2026-06-01','a')
         with self.storage.connection() as db: self.catalog.reconcile(db,'tradein')
