@@ -19,3 +19,7 @@ Il catalogo approvato, le proposte, le soglie e le notifiche condividono il data
 ## Verifica
 
 `python -m unittest discover -s tests -v` esegue le prove API, coda e migrazione con dati temporanei. `npm ci && npm run build` in `frontend` verifica la compilazione. I componenti React in `frontend/vendor/wefix` provengono dalla repo `wefix-ui-ux-kit`, commit `dd6586149914782e9e3c27bba9e591586f60212d`; sono soggetti alla licenza del kit. Database, file Excel, token, log e credenziali rimangono fuori da Git.
+
+## Accesso amministratore
+
+La consultazione dei prezzi resta disponibile senza accesso all’interno del portale. La scheda Esecuzioni e le relative API richiedono la sessione amministratore. La password si configura fuori da Git nella variabile privata `WEFIX_PRICES_ADMIN_PASSWORD_SHA256`, contenente il digest SHA-256 della password; senza questa configurazione il login è disabilitato. La sessione dura al massimo otto ore e termina al riavvio del servizio.

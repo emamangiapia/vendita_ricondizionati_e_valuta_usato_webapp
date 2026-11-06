@@ -20,3 +20,5 @@ aside small{display:block;margin-top:8px}.job-list{display:flex;flex-wrap:wrap;g
 .trend-legend {display:flex;flex-wrap:wrap;gap:12px 20px;list-style:none;padding:0;margin:12px 0 18px;color:var(--wfx-text)}
 .trend-legend li {display:flex;align-items:center;gap:7px;font-weight:650;font-size:13px}
 .trend-legend svg {flex:none}
+
+.admin-login-button{width:100%;margin-top:22px;text-align:left}.admin-login{display:grid;gap:12px;margin-top:12px}.admin-login input{width:100%;min-width:0;padding:10px;border:1px solid #ddd;border-radius:8px;font:inherit}.admin-login p{color:#a42424;margin:0}
