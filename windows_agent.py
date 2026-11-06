@@ -32,6 +32,7 @@ def run(job):
     result_code=0; error=None; log_error=False
     env=os.environ.copy(); env['PYTHONUNBUFFERED']='1';env['PYTHONIOENCODING']='utf-8'
     env.pop('WEFIX_AGENT_TOKEN',None);env.pop('WEFIX_API_TOKEN',None)
+    env['WEFIX_CHALLENGE_API']=URL; env['WEFIX_CHALLENGE_TOKEN']=TOKEN; env['WEFIX_CHALLENGE_JOB']=str(job_id)
     env['WEFIX_WEBAPP_HOME']=str(Path(__file__).resolve().parent)
     try:
         for index,(exe,script,cwd) in enumerate(commands(action),1):

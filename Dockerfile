@@ -9,7 +9,7 @@ FROM python:3.11-slim
 WORKDIR /app
 COPY requirements-container.txt ./
 RUN pip install --no-cache-dir -r requirements-container.txt
-COPY storage.py price_catalog.py queue_store.py local_api.py job_runner.py import_drive.py ingest.py web_proxy.py container_start.py migration_restore.py ./
+COPY challenge_store.py storage.py price_catalog.py queue_store.py local_api.py job_runner.py import_drive.py ingest.py web_proxy.py container_start.py migration_restore.py ./
 COPY --from=ui /src/dist ./frontend/dist
 ENV WEFIX_DB_PATH=/app/data/wefix_prices.sqlite3 WEFIX_QUEUE_ENABLED=1 WEFIX_API_BIND=0.0.0.0
 EXPOSE 8000 8766

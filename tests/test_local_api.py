@@ -36,6 +36,27 @@ class ApiTests(unittest.TestCase):
         c.request(method, path, body=body, headers=headers)
         r = c.getresponse(); data = json.loads(r.read()); c.close()
         return r.status, data
+    def test_manual_challenge_is_scoped_and_input_is_delivered_once(self):
+        import queue_store
+        import challenge_store
+        challenge_store.STATE.clear()
+        job = queue_store.enqueue('sale')
+        queue_store.claim()
+        frame = base64.b64encode(b'\xff\xd8test').decode()
+        payload = json.dumps({'id':job,'frame':frame})
+        self.assertEqual(self.request('POST','/agent/challenge',payload)[0],401)
+        self.assertEqual(self.request('POST','/agent/challenge',payload,self.token),(200,{'events':[]}))
+        state = self.request('GET',f'/jobs/{job}/challenge',token=self.token)[1]
+        self.assertTrue(state['active'])
+        self.assertEqual(state['frame'],frame)
+        event = {'type':'down','x':0.4,'y':0.5}
+        self.assertEqual(self.request('POST',f'/jobs/{job}/challenge',json.dumps(event),self.token)[0],200)
+        self.assertEqual(self.request('POST','/agent/challenge',payload,self.token)[1]['events'],[event])
+        self.assertEqual(self.request('POST','/agent/challenge',payload,self.token)[1]['events'],[])
+        self.assertEqual(self.request('POST',f'/jobs/{job}/challenge','{"type":"navigate","url":"file:///"}',self.token)[0],400)
+        self.request('POST','/agent/challenge',json.dumps({'id':job,'frame':None}),self.token)
+        self.assertFalse(self.request('GET',f'/jobs/{job}/challenge',token=self.token)[1]['active'])
+
     def test_requires_token_and_rejects_unlisted_command(self):
         self.assertEqual(self.request('GET','/snapshots')[0],401)
         self.assertEqual(self.request('GET','/snapshots',token='wrong')[0],401)

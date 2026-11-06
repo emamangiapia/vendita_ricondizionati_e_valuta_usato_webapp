@@ -18,6 +18,7 @@ load_dotenv(Path(__file__).resolve().parent / '.env')
 import storage
 import price_catalog
 import queue_store
+import challenge_store
 from job_runner import SCRIPTS_TRADE
 
 ACTIONS = {'sale', 'trade_all', 'all_scrapers', 'import_history', *(f'trade_{i}' for i in range(1, 7))}
@@ -93,6 +94,8 @@ def handler_for(token, ingest_token=None, agent_token=None):
                     kind = query.get('kind', [''])[0]
                     if kind not in ('sale','tradein'): raise ValueError('Tipo non valido')
                     return self.reply(200, records(storage.history(kind, query['model'][0], int(query['storage'][0]), query.get('color',[None])[0], query.get('sheet',[None])[0])))
+                if parsed.path.startswith('/jobs/') and parsed.path.endswith('/challenge'):
+                    return self.reply(200, challenge_store.read(int(parsed.path.split('/')[2])))
                 if parsed.path == '/jobs':
                     return self.reply(200, records(storage.jobs().drop(columns=['log_file'], errors='ignore')))
                 if parsed.path.startswith('/jobs/') and parsed.path.endswith('/log'):
@@ -146,10 +149,12 @@ def handler_for(token, ingest_token=None, agent_token=None):
             if self.path.startswith('/agent/'):
                 try:
                     size = int(self.headers.get('Content-Length', '0'))
-                    if not 0 < size <= 128 * 1024: raise ValueError('Dimensione non valida')
+                    if not 0 < size <= (1600000 if self.path == '/agent/challenge' else 128 * 1024): raise ValueError('Dimensione non valida')
                     body = json.loads(self.rfile.read(size))
                     if not isinstance(body, dict): raise ValueError('Richiesta non valida')
                     agent_seen[0] = time.monotonic()
+                    if self.path == '/agent/challenge' and set(body) == {'id','frame'}:
+                        return self.reply(200, {'events':challenge_store.publish(body['id'], body['frame'])})
                     if self.path == '/agent/claim' and not body:
                         return self.reply(200, {'job':queue_store.claim()})
                     if self.path == '/agent/log' and set(body) == {'id','text'} and type(body['id']) is int:
@@ -186,6 +191,14 @@ def handler_for(token, ingest_token=None, agent_token=None):
                     return self.reply(200, result)
                 except (KeyError, TypeError, ValueError, binascii.Error, json.JSONDecodeError):
                     return self.reply(400, {'error':'File o richiesta non validi'})
+            if self.path.startswith('/jobs/') and self.path.endswith('/challenge'):
+                try:
+                    size=int(self.headers.get('Content-Length','0'))
+                    if not 0 < size <= 1024: raise ValueError()
+                    challenge_store.input_event(int(self.path.split('/')[2]), json.loads(self.rfile.read(size)))
+                    return self.reply(200, {'ok':True})
+                except (TypeError, ValueError, KeyError):
+                    return self.reply(400, {'error':'Verifica non disponibile o comando non valido'})
             if self.path.startswith('/jobs/') and self.path.endswith('/continue'):
                 try:
                     parts=self.path.split('/')

@@ -93,7 +93,7 @@ class Handler(BaseHTTPRequestHandler):
         except URLError: self.respond(503,b'{"error":"Servizio dati non disponibile"}')
     def proxy(self,method):
         path=self.path.removeprefix('/api/wefix'); route=urlsplit(path).path
-        if (method=='POST' and route!='/jobs' and not (route.startswith('/jobs/') and route.endswith('/continue'))) or (method=='GET' and route not in ALLOWED_GET and not (route.startswith('/jobs/') and route.endswith('/log'))):
+        if (method=='POST' and route!='/jobs' and not (route.startswith('/jobs/') and route.endswith(('/continue','/challenge')))) or (method=='GET' and route not in ALLOWED_GET and not (route.startswith('/jobs/') and route.endswith(('/log','/challenge')))):
             self.send_error(404);return
         if (route == '/jobs' or route.startswith('/jobs/')) and not self.is_admin():
             return self.respond(401,b'{"error":"Accesso amministratore richiesto"}')

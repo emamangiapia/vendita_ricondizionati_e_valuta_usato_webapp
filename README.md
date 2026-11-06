@@ -23,3 +23,9 @@ Il catalogo approvato, le proposte, le soglie e le notifiche condividono il data
 ## Accesso amministratore
 
 La consultazione dei prezzi resta disponibile senza accesso all’interno del portale. La scheda Esecuzioni e le relative API richiedono la sessione amministratore. La password si configura fuori da Git nella variabile privata `WEFIX_PRICES_ADMIN_PASSWORD_SHA256`, contenente il digest SHA-256 della password; senza questa configurazione il login è disabilitato. La sessione dura al massimo otto ore e termina al riavvio del servizio.
+
+## Verifica manuale nella webapp
+
+Quando lo scraper Playwright dei ricondizionati rileva un CAPTCHA, la scheda Esecuzioni mostra il browser della stessa sessione. Dopo l'accesso amministratore, selezionare l'esecuzione attiva, risolvere la verifica con click o trascinamento e premere «Verifica completata · Continua». La finestra è disponibile anche da telefono. Il browser continua a girare sul PC Windows: la sessione Windows deve rimanere attiva.
+
+La funzione richiede l'agente aggiornato e lo scraper `calcola_acquista_usato` con l'integrazione `manual_challenge`. Gli altri scraper mantengono il proprio comportamento. Le immagini non vengono archiviate: restano in memoria durante la verifica; gli input sono limitati a mouse, tasti di navigazione e ripresa, e richiedono una sessione amministratore. Una nuova esecuzione usa la versione aggiornata dell'agente quando quello precedente termina il lavoro corrente.
