@@ -21,3 +21,4 @@ frontend/**
 !frontend/vendor/
 !frontend/vendor/**
 !frontend/vite.config.js
+!challenge_store.py
