@@ -11,6 +11,7 @@ ROOT=Path(__file__).resolve().parent/'frontend'/'dist'
 TOKEN=os.environ.get('WEFIX_API_TOKEN','')
 CATALOG_TOKEN=os.environ.get('WEFIX_CATALOG_TOKEN','')
 ADMIN_HASH=os.environ.get('WEFIX_PRICES_ADMIN_PASSWORD_SHA256','')
+OWNER_TOKEN=os.environ.get('WEFIX_INTERNAL_OWNER_TOKEN','')
 SESSIONS={}
 SESSION_LOCK=threading.Lock()
 SESSION_TTL=8*60*60
@@ -43,6 +44,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == '/api/wefix/logout': return self.logout()
         return self.proxy('POST')
     def is_admin(self):
+        provided=self.headers.get('X-WeFix-Internal-Owner','')
+        if len(OWNER_TOKEN)>=32 and hmac.compare_digest(provided,OWNER_TOKEN): return True
         cookie=SimpleCookie()
         try: cookie.load(self.headers.get('Cookie',''))
         except Exception: return False

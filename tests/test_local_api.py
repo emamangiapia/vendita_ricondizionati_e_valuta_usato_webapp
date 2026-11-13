@@ -70,7 +70,7 @@ class ApiTests(unittest.TestCase):
     def test_catalog_requires_token_and_applies_actions(self):
         self.assertEqual(self.request('GET','/catalog?kind=sale')[0],401)
         status, result = self.request('GET','/catalog?kind=sale',token=self.token)
-        self.assertEqual(status,200); self.assertEqual(result['rules']['mode'],'manual')
+        self.assertEqual(status,200); self.assertEqual(result['rules']['mode'],'auto'); self.assertEqual(result['rules']['up_limit'],10.0); self.assertEqual(result['rules']['down_limit'],10.0)
         price={'kind':'sale','source':'principale','model':'iPhone 15','color':'Blu','storage_gb':128,'price':300}
         body=json.dumps({'action':'price','actor':'walter','price':price})
         self.assertEqual(self.request('POST','/catalog/action',body=body,token=self.token)[0],200)

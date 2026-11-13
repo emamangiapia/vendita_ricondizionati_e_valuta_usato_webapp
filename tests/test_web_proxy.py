@@ -38,6 +38,15 @@ class AdminAccessTests(unittest.TestCase):
             self.handler.proxy('POST')
             self.assertEqual(self.responses[-1][0], 401)
 
+    def test_private_owner_header_requires_exact_configured_token(self):
+        with patch.object(web_proxy, 'OWNER_TOKEN', 'internal-owner-token-at-least-32-characters'):
+            self.handler.headers = {'X-WeFix-Internal-Owner': 'wrong'}
+            self.assertFalse(self.handler.is_admin())
+            self.handler.headers = {'X-WeFix-Internal-Owner': 'internal-owner-token-at-least-32-characters'}
+            self.assertTrue(self.handler.is_admin())
+        with patch.object(web_proxy, 'OWNER_TOKEN', ''):
+            self.assertFalse(self.handler.is_admin())
+
     def test_missing_password_configuration_denies_login(self):
         with patch.object(web_proxy, 'ADMIN_HASH', ''):
             self.assertEqual(self.login('anything')[0], 401)

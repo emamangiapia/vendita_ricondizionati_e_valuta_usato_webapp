@@ -1,6 +1,12 @@
 import signal, subprocess, sys, time
 from migration_restore import restore
-restore()
+import os
+from pathlib import Path
+from cloud_bootstrap import initialize_cloud
+if os.environ.get('WEFIX_CLOUD_MODE')=='production':
+    initialize_cloud()
+else:
+    restore()
 children=[]
 def stop(*_):
     for child in children:
