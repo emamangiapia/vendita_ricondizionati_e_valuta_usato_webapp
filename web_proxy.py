@@ -4,7 +4,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from urllib.request import Request,urlopen
 from urllib.error import HTTPError,URLError
-import mimetypes,os,hmac,hashlib,json,secrets,time,threading
+import mimetypes,os,hmac,hashlib,json,secrets,time,threading,socket
 from http.cookies import SimpleCookie
 
 ROOT=Path(__file__).resolve().parent/'frontend'/'dist'
@@ -119,4 +119,8 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers();self.wfile.write(data)
 if __name__=='__main__':
     if len(TOKEN)<32: raise SystemExit('Token mancante')
-    ThreadingHTTPServer(('0.0.0.0',8000),Handler).serve_forever()
+    if os.environ.get('WEFIX_CLOUD_MODE')=='production':
+        class CloudServer(ThreadingHTTPServer): address_family=socket.AF_INET6
+        CloudServer(('::',8000),Handler).serve_forever()
+    else:
+        ThreadingHTTPServer(('0.0.0.0',8000),Handler).serve_forever()
