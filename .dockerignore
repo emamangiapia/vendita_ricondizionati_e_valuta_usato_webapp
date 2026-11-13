@@ -22,3 +22,5 @@ frontend/**
 !frontend/vendor/**
 !frontend/vite.config.js
 !challenge_store.py
+
+!cloud_bootstrap.py
