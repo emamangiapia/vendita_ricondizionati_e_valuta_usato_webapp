@@ -15,10 +15,23 @@ OWNER_TOKEN=os.environ.get('WEFIX_INTERNAL_OWNER_TOKEN','')
 SESSIONS={}
 SESSION_LOCK=threading.Lock()
 SESSION_TTL=8*60*60
+TRANSPORT_REQUIRED=os.environ.get('WEFIX_TRANSPORT_REQUIRED')=='true'
+TRANSPORT_KEY=os.environ.get('WEFIX_TRANSPORT_KEY','')
+if TRANSPORT_REQUIRED and len(TRANSPORT_KEY)<64: raise RuntimeError('Configure transport key')
 ALLOWED_GET={'/health','/snapshots','/prices','/history','/jobs'}
 class Handler(BaseHTTPRequestHandler):
     def log_message(self,*args): pass
+    def transport_allowed(self):
+        if not TRANSPORT_REQUIRED: return True
+        if not hmac.compare_digest(self.headers.get('X-WeFix-Transport-Key',''),TRANSPORT_KEY): return False
+        original=self.headers.get('X-WeFix-Forwarded-Host')
+        if original:
+            del self.headers['Host']
+            self.headers['Host']=original
+        return True
     def do_GET(self):
+        if urlsplit(self.path).path=='/healthz': return self.respond(200,b'{"ok":true}')
+        if not self.transport_allowed(): return self.respond(404,b'{"error":"Non trovato"}')
         path=urlsplit(self.path).path
         if path == '/api/wefix/session': return self.respond(200,json.dumps({'admin':self.is_admin()}).encode())
         if path in ('/api/catalog','/api/catalog/notifications'): return self.catalog('GET')
@@ -35,6 +48,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Cache-Control','no-store');self.send_header('X-Content-Type-Options','nosniff')
         self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
     def do_POST(self):
+        if not self.transport_allowed(): return self.respond(404,b'{"error":"Non trovato"}')
         if urlsplit(self.path).path == '/api/catalog/action': return self.catalog('POST')
         origin=self.headers.get('Origin','')
         if not origin or urlsplit(origin).netloc != self.headers.get('Host',''):

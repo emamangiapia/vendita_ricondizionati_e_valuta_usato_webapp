@@ -47,6 +47,20 @@ class AdminAccessTests(unittest.TestCase):
         with patch.object(web_proxy, 'OWNER_TOKEN', ''):
             self.assertFalse(self.handler.is_admin())
 
+    def test_transport_guards_ui_api_and_posts(self):
+        with patch.object(web_proxy,'TRANSPORT_REQUIRED',True),patch.object(web_proxy,'TRANSPORT_KEY','x'*64):
+            for path in ['/','/api/wefix/session','/api/catalog']:
+                self.handler.path=path
+                self.handler.do_GET()
+                self.assertEqual(self.responses[-1][0],404)
+            self.handler.path='/api/wefix/login';self.handler.do_POST()
+            self.assertEqual(self.responses[-1][0],404)
+            self.handler.path='/healthz';self.handler.do_GET()
+            self.assertEqual(self.responses[-1][0],200)
+            self.handler.headers={'X-WeFix-Transport-Key':'x'*64,'X-WeFix-Forwarded-Host':'portal.example','Host':'transport.example'}
+            self.assertTrue(self.handler.transport_allowed())
+            self.assertEqual(self.handler.headers['Host'],'portal.example')
+
     def test_missing_password_configuration_denies_login(self):
         with patch.object(web_proxy, 'ADMIN_HASH', ''):
             self.assertEqual(self.login('anything')[0], 401)
