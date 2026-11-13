@@ -1,5 +1,7 @@
 # WeFix · Prezzi e usato
 
+> **Railway cloud, 13 novembre 2026:** [Configurazione Prices nel cloud](docs/railway-cloud.md). Lo storico è online; il runner scraper rimane Windows.
+
 Dashboard React per Railway Locale, con archivio SQLite persistente e agente Windows per gli scraper. Il catalogo Lavoro richiede la sessione del proprietario; non è previsto un link cliente pubblico. Gli scraper usano i propri `.venv`, browser e percorsi Windows esistenti.
 
 ## Funzionamento
